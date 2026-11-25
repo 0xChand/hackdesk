@@ -96,6 +96,20 @@ npm run dev                    # eve terminal UI
 
 The model comes from whichever key is set (`agent/lib/model.ts`): Claude if `ANTHROPIC_API_KEY` is set, otherwise OpenAI, otherwise an AI Gateway id (override with `HACKDESK_MODEL`). Set `GITHUB_TOKEN` for higher audit rate limits.
 
+### Desktop reminders (no server, no model)
+
+`scripts/desk.ts` uses the same store from the command line:
+
+```bash
+npm run desk -- list                                   # everything, most urgent first
+npm run desk -- track challenge.json                   # add a hackathon
+npm run desk -- done eve-builder-challenge c4 "https://x.com/…"
+npm run desk -- remind [--urgent-only]                 # desktop notification + brief.md
+npm run desk -- watch                                  # diff the challenge pages now
+```
+
+On Windows, schedule it with Task Scheduler. Use `wscript.exe scripts\desk-hidden.vbs remind` so it runs without a console window. Use cron on macOS or Linux. I run it at 09:00 for everything and at 20:00 for anything under 48h, so a deadline reaches me even when the agent isn't running.
+
 ### Things to say
 
 ```

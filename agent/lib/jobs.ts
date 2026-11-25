@@ -1,8 +1,9 @@
 // Work shared by tools and schedules. Schedules call these directly, so the
 // watcher and the daily brief run without a model.
 
+import { resolveDeadline } from "./deadline.ts";
 import { fetchPage } from "./page.ts";
-import { dataDir, update } from "./store.ts";
+import { dataDir, slugify, update, type Challenge } from "./store.ts";
 import { briefMarkdown, sortByUrgency, viewOf } from "./view.ts";
 import { diff, snapshot } from "./watch.ts";
 
@@ -90,4 +91,63 @@ export async function buildBrief(now = new Date()): Promise<string> {
   const { load } = await import("./store.ts");
   const db = await load();
   return briefMarkdown(sortByUrgency(db.challenges.map((c) => viewOf(c, now))), now);
+}
+
+export interface TrackInput {
+  name: string;
+  url: string;
+  deadlineDate: string;
+  deadlineTime?: string;
+  timezone?: string;
+  deadlineWording?: string;
+  prizes?: string;
+  judgingCriteria?: string[];
+  requiredKeywords?: string[];
+  checklist: { text: string; required?: boolean }[];
+  repoUrl?: string;
+}
+
+/** Track (or re-track) a challenge. Shared by the track_challenge tool and scripts/track.ts. */
+export async function trackChallenge(input: TrackInput, signal?: AbortSignal) {
+  // Same resolver read_challenge uses, fed the page's own words plus explicit fields.
+  const wording = input.deadlineWording ?? `Deadline ${input.deadlineDate}`;
+  const r = resolveDeadline(input.deadlineDate, `${wording} ${input.deadlineTime ?? ""} ${input.timezone ?? ""}`);
+  const assumptions = [...r.notes];
+  if (input.timezone && r.assumedTz) assumptions.push(`unrecognized timezone "${input.timezone}": assumed UTC`);
+  const tz = r.tz.replace(" (assumed)", "");
+
+  // Baseline snapshot for change detection. Failure here shouldn't block tracking.
+  const snap = await fetchPage(input.url, signal)
+    .then((p) => snapshot(p.text))
+    .catch(() => undefined);
+
+  return update((db) => {
+    const now = new Date().toISOString();
+    const existing = db.challenges.find((c) => c.url === input.url || c.id === slugify(input.name));
+    const prev = new Map(existing?.checklist.map((i) => [i.text.toLowerCase(), i]) ?? []);
+    const challenge: Challenge = {
+      id: existing?.id ?? slugify(input.name),
+      name: input.name,
+      url: input.url,
+      deadlineAt: r.at,
+      planAt: r.conservativeAt,
+      deadlineLabel: `${input.deadlineDate} ${r.time} ${tz}`,
+      deadlineAssumptions: assumptions,
+      prizes: input.prizes,
+      judgingCriteria: input.judgingCriteria ?? [],
+      requiredKeywords: input.requiredKeywords ?? [],
+      repoUrl: input.repoUrl ?? existing?.repoUrl,
+      lastAudit: existing?.lastAudit,
+      checklist: input.checklist.map((item, i) => {
+        const p = prev.get(item.text.toLowerCase());
+        return { id: `c${i + 1}`, text: item.text, required: item.required ?? true, done: p?.done ?? false, note: p?.note };
+      }),
+      snapshot: snap ?? existing?.snapshot,
+      changes: existing?.changes ?? [],
+      createdAt: existing?.createdAt ?? now,
+      updatedAt: now,
+    };
+    db.challenges = [...db.challenges.filter((c) => c.id !== challenge.id), challenge];
+    return { tracked: challenge.id, updated: Boolean(existing), watching: Boolean(snap), ...viewOf(challenge) };
+  });
 }

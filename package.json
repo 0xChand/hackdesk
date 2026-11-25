@@ -16,7 +16,8 @@
     "test": "node --test test/lib.test.ts",
     "smoke": "node test/live-smoke.ts",
     "chat": "node scripts/chat.ts",
-    "record-demo": "node scripts/record-demo.ts"
+    "record-demo": "node scripts/record-demo.ts",
+    "desk": "node scripts/desk.ts"
   },
   "dependencies": {
     "@vercel/connect": "2.7.0",

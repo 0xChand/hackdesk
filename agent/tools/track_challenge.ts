@@ -1,10 +1,6 @@
 import { defineTool } from "eve/tools";
 import { z } from "zod";
-import { resolveDeadline } from "../lib/deadline.ts";
-import { fetchPage } from "../lib/page.ts";
-import { slugify, update, type Challenge } from "../lib/store.ts";
-import { viewOf } from "../lib/view.ts";
-import { snapshot } from "../lib/watch.ts";
+import { trackChallenge } from "../lib/jobs.ts";
 
 export default defineTool({
   description:
@@ -30,49 +26,6 @@ export default defineTool({
   }),
   label: { start: () => "Tracking the challenge" },
   async execute(input, ctx) {
-    // Same resolver read_challenge uses, fed the page's own words plus explicit fields.
-    const wording = input.deadlineWording ?? `Deadline ${input.deadlineDate}`;
-    const r = resolveDeadline(input.deadlineDate, `${wording} ${input.deadlineTime ?? ""} ${input.timezone ?? ""}`);
-    const assumptions = [...r.notes];
-    if (input.timezone && r.assumedTz) assumptions.push(`unrecognized timezone "${input.timezone}": assumed UTC`);
-    const tz = { tz: r.tz.replace(" (assumed)", ""), offsetHours: r.offsetHours };
-    const time = r.time;
-    const deadlineAt = r.at;
-    const planAt = r.conservativeAt;
-
-    // Baseline snapshot for change detection. Failure here shouldn't block tracking.
-    const snap = await fetchPage(input.url, ctx.abortSignal)
-      .then((p) => snapshot(p.text))
-      .catch(() => undefined);
-
-    return update((db) => {
-      const now = new Date().toISOString();
-      const existing = db.challenges.find((c) => c.url === input.url || c.id === slugify(input.name));
-      const prev = new Map(existing?.checklist.map((i) => [i.text.toLowerCase(), i]) ?? []);
-      const challenge: Challenge = {
-        id: existing?.id ?? slugify(input.name),
-        name: input.name,
-        url: input.url,
-        deadlineAt,
-        planAt,
-        deadlineLabel: `${input.deadlineDate} ${time} ${tz.tz}`,
-        deadlineAssumptions: assumptions,
-        prizes: input.prizes,
-        judgingCriteria: input.judgingCriteria,
-        requiredKeywords: input.requiredKeywords,
-        repoUrl: input.repoUrl ?? existing?.repoUrl,
-        lastAudit: existing?.lastAudit,
-        checklist: input.checklist.map((item, i) => {
-          const p = prev.get(item.text.toLowerCase());
-          return { id: `c${i + 1}`, text: item.text, required: item.required, done: p?.done ?? false, note: p?.note };
-        }),
-        snapshot: snap ?? existing?.snapshot,
-        changes: existing?.changes ?? [],
-        createdAt: existing?.createdAt ?? now,
-        updatedAt: now,
-      };
-      db.challenges = [...db.challenges.filter((c) => c.id !== challenge.id), challenge];
-      return { tracked: challenge.id, updated: Boolean(existing), watching: Boolean(snap), ...viewOf(challenge) };
-    });
+    return trackChallenge(input, ctx.abortSignal);
   },
 });
