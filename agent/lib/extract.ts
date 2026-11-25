@@ -10,6 +10,8 @@ export interface DateHit {
   context: string;
   /** True when the surrounding text uses deadline-ish language. */
   looksLikeDeadline: boolean;
+  /** Text right around the date (same sentence), where a time and timezone would be written. */
+  near: string;
 }
 
 export interface LinkHit {
@@ -23,7 +25,7 @@ const MONTHS: Record<string, number> = {
 };
 
 const DEADLINE_WORDS =
-  /\b(deadline|due|closes?|closing|ends?|submissions?|submit by|until|last day|cutoff|cut-off)\b/i;
+  /\b(deadline|due|closes?|closing|ends?|submissions?|submit|until|last day|cutoff|cut-off|no later than)\b/i;
 
 const ENTITY: Record<string, string> = {
   amp: "&", lt: "<", gt: ">", quot: '"', apos: "'", nbsp: " ", "#39": "'",
@@ -78,6 +80,14 @@ function lead(text: string, index: number): string {
   return cut >= 0 ? before.slice(cut + 1) : before;
 }
 
+/** Up to 60 chars after `index`, cut at the next sentence boundary or the next date-like token. */
+function trail(text: string, index: number): string {
+  let after = text.slice(index, index + 60);
+  const stop = after.search(/(?<!\b[ap]\.?m)\.\s|\n|\b(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*\.?\s+\d/i);
+  if (stop >= 0) after = after.slice(0, stop);
+  return after;
+}
+
 /**
  * Find dates in free text. Handles "December 11, 2026", "Dec 11 2026",
  * "11 December 2026", and ISO "2026-12-11". Returns them in document order.
@@ -125,25 +135,12 @@ export function findDates(text: string, defaultYear?: number): DateHit[] {
         iso: h.iso,
         context,
         looksLikeDeadline: DEADLINE_WORDS.test(lead(text, h.index)),
+        near: `${lead(text, h.index).slice(-30)}${h.raw}${trail(text, h.index + h.raw.length)}`,
       };
     });
-}
-
-/** Whole days from `now` until the end of `isoDate` (23:59:59 in the given UTC offset). */
-export function daysUntil(isoDate: string, now: Date, utcOffsetHours = 0): number {
-  const [y, m, d] = isoDate.slice(0, 10).split("-").map(Number) as [number, number, number];
-  const end = Date.UTC(y, m - 1, d, 23, 59, 59) - utcOffsetHours * 3_600_000;
-  return Math.floor((end - now.getTime()) / 86_400_000);
 }
 
 /** Post length as X counts it: every URL is 23 characters. */
 export function xLength(s: string): number {
   return s.replace(/https?:\/\/\S+/g, "x".repeat(23)).length;
-}
-
-export function urgency(days: number): "overdue" | "critical" | "soon" | "comfortable" {
-  if (days < 0) return "overdue";
-  if (days <= 2) return "critical";
-  if (days <= 7) return "soon";
-  return "comfortable";
 }

@@ -13,6 +13,6 @@ console.log(`${url}: ${text.length} chars of text`);
 for (const d of dates) console.log(`  ${d.looksLikeDeadline ? "DEADLINE?" : "         "} ${d.iso}  "${d.context.slice(0, 110)}"`);
 
 const facts = await fetchRepoFacts(repo);
-const { score, findings } = auditRepo(facts, { deadline: dates.find((d) => d.looksLikeDeadline)?.iso ?? undefined, requiredKeywords: ["eve"] });
+const { score, findings } = auditRepo(facts, { requiredKeywords: ["eve"] });
 console.log(`\n${facts.fullName}: readiness ${score}/100`);
 for (const f of findings) console.log(`  [${f.status}] ${f.check}: ${f.detail}`);
