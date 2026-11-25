@@ -116,7 +116,7 @@ npm run eval      # 5 eve evals against the running agent (needs a model key)
 npm run typecheck
 ```
 
-CI runs the typecheck, the unit tests and `eve build` on every push.
+`.github/workflows/ci.yml` runs the same typecheck, unit tests and `eve build`.
 
 ## Dogfooding
 

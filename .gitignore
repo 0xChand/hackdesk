@@ -10,3 +10,5 @@ dist
 *.tsbuildinfo
 .hackdesk
 !.env.example
+docs/demo.webm
+docs/demo.mp4

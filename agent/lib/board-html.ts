@@ -178,7 +178,9 @@ async function stream(id){const r=await fetch("/eve/v1/session/"+id+"/stream");c
         if(f.type==="turn.settled"){doneTurns.add(f.data.turnId);if(f.data.outcome==="failed")add("t","✗ "+(f.data.error&&f.data.error.message||"failed"));rd.cancel();return}}}}}
 document.getElementById("f").addEventListener("submit",async e=>{e.preventDefault();const q=document.getElementById("q");const text=q.value.trim();if(!text)return;q.value="";add("u",text);
   const url=sid?"/eve/v1/session/"+sid:"/eve/v1/session";const r=await fetch(url,{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({message:text})});const j=await r.json();
-  if(!j.ok){add("t","✗ "+(j.error||r.status));return}sid=j.sessionId;await stream(sid);if(/track|audit|done|check/i.test(text))setTimeout(()=>location.reload(),800)});
+  window.__busy=true;
+  if(!j.ok){add("t","✗ "+(j.error||r.status));window.__busy=false;return}sid=j.sessionId;try{await stream(sid)}finally{window.__busy=false}
+  if(/track|audit|done|check|mark/i.test(text))setTimeout(()=>location.reload(),800)});
 </script>
 </body></html>`;
 }
