@@ -27,6 +27,9 @@ const MONTHS: Record<string, number> = {
 const DEADLINE_WORDS =
   /\b(deadline|due|closes?|closing|ends?|submissions?|submit|until|last day|cutoff|cut-off|no later than)\b/i;
 
+/** "post it by Sun Nov 29", "in by Dec 1": "by" right before the date (weekday allowed). */
+const BY_DATE = /\bby\s+((mon|tue|wed|thu|fri|sat|sun)[a-z]*\.?,?\s*)?$/i;
+
 const ENTITY: Record<string, string> = {
   amp: "&", lt: "<", gt: ">", quot: '"', apos: "'", nbsp: " ", "#39": "'",
 };
@@ -134,7 +137,7 @@ export function findDates(text: string, defaultYear?: number): DateHit[] {
         raw: h.raw,
         iso: h.iso,
         context,
-        looksLikeDeadline: DEADLINE_WORDS.test(lead(text, h.index)),
+        looksLikeDeadline: DEADLINE_WORDS.test(lead(text, h.index)) || BY_DATE.test(lead(text, h.index)),
         near: `${lead(text, h.index).slice(-30)}${h.raw}${trail(text, h.index + h.raw.length)}`,
       };
     });

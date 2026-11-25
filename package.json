@@ -14,7 +14,8 @@
     "start": "eve start",
     "typecheck": "tsc",
     "test": "node --test test/lib.test.ts",
-    "smoke": "node test/live-smoke.ts"
+    "smoke": "node test/live-smoke.ts",
+    "chat": "node scripts/chat.ts"
   },
   "dependencies": {
     "@vercel/connect": "2.7.0",

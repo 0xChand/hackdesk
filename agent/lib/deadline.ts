@@ -155,6 +155,48 @@ export function resolveDeadline(date: string, nearbyText: string): DeadlineGuess
   };
 }
 
+export interface Candidate extends DeadlineGuess {
+  evidence: string;
+  /** How many times the page states this cutoff. */
+  mentions: number;
+}
+
+/**
+ * Pages state the deadline several times, often precisely once ("Nov 29, 11:59 PM
+ * PT") and loosely elsewhere ("post by Nov 29"). Merge mentions of the same date:
+ * a precise mention's time and zone win over assumed ones.
+ */
+export function consolidate(hits: { iso: string; near: string; context: string }[]): Candidate[] {
+  const byDate = new Map<string, Candidate[]>();
+  for (const h of hits) {
+    const g = { ...resolveDeadline(h.iso, h.near), evidence: h.context, mentions: 1 };
+    const list = byDate.get(h.iso) ?? [];
+    list.push(g);
+    byDate.set(h.iso, list);
+  }
+  const out: Candidate[] = [];
+  for (const list of byDate.values()) {
+    const precision = (c: Candidate) => (c.assumedTz ? 0 : 2) + (c.assumedTime ? 0 : 1);
+    const best = Math.max(...list.map(precision));
+    const kept = new Map<string, Candidate>();
+    for (const c of list) {
+      // Keep only the most precise readings, plus any wording that makes it earlier ("before").
+      const earlier = c.notes.some((n) => n.startsWith('"before'));
+      if (precision(c) < best && !earlier) continue;
+      const key = `${c.at}|${c.conservativeAt}`;
+      const prev = kept.get(key);
+      if (prev) prev.mentions++;
+      else kept.set(key, { ...c });
+    }
+    const total = list.length;
+    const ks = [...kept.values()];
+    // Credit loose mentions to the precise reading they were folded into.
+    if (ks.length === 1) ks[0]!.mentions = total;
+    out.push(...ks);
+  }
+  return out.sort((a, b) => b.mentions - a.mentions || a.at.localeCompare(b.at));
+}
+
 /** "3d 4h", "5h 12m", "overdue by 2h". */
 export function humanizeLeft(at: string, now: Date): string {
   let ms = new Date(at).getTime() - now.getTime();

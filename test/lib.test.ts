@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { extractLinks, findDates, htmlToText, xLength } from "../agent/lib/extract.ts";
-import { findTime, findZone, humanizeLeft, resolveDeadline, toInstant, urgencyOf } from "../agent/lib/deadline.ts";
+import { consolidate, findTime, findZone, humanizeLeft, resolveDeadline, toInstant, urgencyOf } from "../agent/lib/deadline.ts";
 import { auditRepo, parseDependencies, parseRepo, type RepoFacts } from "../agent/lib/audit.ts";
 import { diff, normalizeLines, snapshot } from "../agent/lib/watch.ts";
 import { googleCalendarUrl, toIcs } from "../agent/lib/ics.ts";
@@ -83,6 +83,22 @@ test("'Submit before <date>' with no time or zone plans for the earliest reading
   const exact = resolveDeadline("2026-11-08", "Submissions close Nov 8, 2026 23:59 AoE");
   assert.equal(exact.conservativeAt, exact.at);
   assert.deepEqual(exact.notes, []);
+});
+
+test("consolidate merges loose mentions into the page's precise one (real Vast showcase wording)", () => {
+  const text = [
+    "Build it. Post it with #BuiltOnVast by Nov 29. Three winners get cash.",
+    "Entries close Sun Nov 29, 11:59 PM PT. Entering means you agree to the rules.",
+    "To submit your build, post it by Sun Nov 29 with @vast_ai and #BuiltOnVast.",
+    "Winners are announced Fri Dec 4.",
+  ].join("\n");
+  const hits = findDates(text, 2026).filter((d) => d.looksLikeDeadline && d.iso);
+  assert.equal(hits.length, 3, "all three 'by/close' mentions of Nov 29 look like deadlines");
+  const c = consolidate(hits.map((d) => ({ iso: d.iso!, near: d.near, context: d.context })));
+  assert.equal(c.length, 1);
+  assert.equal(c[0]!.tz, "PT");
+  assert.equal(c[0]!.at, "2026-11-30T07:59:59.000Z"); // PST: DST ended Nov 1
+  assert.equal(c[0]!.mentions, 3);
 });
 
 test("humanizeLeft and urgencyOf", () => {
