@@ -12,7 +12,9 @@
     "dev": "eve dev",
     "eval": "eve eval",
     "start": "eve start",
-    "typecheck": "tsc"
+    "typecheck": "tsc",
+    "test": "node --test test/lib.test.ts",
+    "smoke": "node test/live-smoke.ts"
   },
   "dependencies": {
     "@vercel/connect": "2.7.0",
@@ -25,7 +27,8 @@
     "typescript": "7.0.2"
   },
   "engines": {
-    "node": "26.x"
-  }
-
+    "node": ">=24"
+  },
+  "description": "A submission desk for hackathon builders: deadlines, checklists, repo audits, a judge subagent, and post drafts. Built with eve.",
+  "license": "Apache-2.0"
 }
